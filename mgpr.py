@@ -21,7 +21,8 @@ class MGPR(gpflow.Parameterized):
             kern.lengthscales.prior = gpflow.priors.Gamma(1,10) # priors have to be included before
             kern.variance.prior = gpflow.priors.Gamma(1.5,2)    # before the model gets compiled
             self.models.append(gpflow.models.GPR(X, Y[:, i:i+1], kern))
-            self.models[i].clear(); self.models[i].compile()
+            self.models[i].clear()
+            self.models[i].compile()
 
     def set_XY(self, X, Y):
         for i in range(len(self.models)):
