@@ -26,25 +26,45 @@ class EnvWrapper():
         self.observation_space = self.env.observation_space
         self.target=target
         self.distance_threshold=0.01
+        self.q=[0.0,-1.0,0.0,2.0,0.0,0.5,0.0]
 
     def step(self, action):
+        self.q+=action
         qpos = {
-            'robot0:shoulder_pan_joint': action[0],
-            'robot0:shoulder_lift_joint': action[1],
-            'robot0:upperarm_roll_joint': action[2],
-            'robot0:elbow_flex_joint': action[3]
+            'robot0:shoulder_pan_joint': self.q[0],
+            'robot0:shoulder_lift_joint': self.q[1],
+            'robot0:upperarm_roll_joint': self.q[2],
+            'robot0:elbow_flex_joint': self.q[3],
+            'robot0:forearm_roll_joint':self.q[4],
+            'robot0:wrist_flex_joint':self.q[5],
+            'robot0:wrist_roll_joint':self.q[6]
         }
         for name, value in qpos.items():
             self.env.sim.data.set_joint_qpos(name, value)
         self.env.sim.forward()
+        time.sleep(1 / 30)
         ob=self.env._get_obs()
-        return ob['achieved_goal']
+        #print(ob)
+        return np.concatenate((ob['achieved_goal'],self.q),axis=0)
 
     def reset(self):
-        self.env.reset()
-        self.env.goal=self.target
-        ob=self.env._get_obs()
-        return ob['achieved_goal']
+        self.q = [0.0, -1.0, 0.0, 2.0, 0.0, 0.5, 0.0]
+        qpos = {
+            'robot0:shoulder_pan_joint':0.0 ,
+            'robot0:shoulder_lift_joint': -1.0,
+            'robot0:upperarm_roll_joint': 0.0,
+            'robot0:elbow_flex_joint': 2.0,
+            'robot0:forearm_roll_joint':0.0,
+            'robot0:wrist_flex_joint': 0.5,
+            'robot0:wrist_roll_joint': 0.0
+        }
+        for name, value in qpos.items():
+            self.env.sim.data.set_joint_qpos(name, value)
+        self.env.goal = self.target
+        self.env.sim.forward()
+        time.sleep(1 / 30)
+        ob = self.env._get_obs()
+        return np.concatenate((ob['achieved_goal'],self.q),axis=0)
 
     def render(self):
         self.env.render()
@@ -59,21 +79,22 @@ def rollout(env,T, random=False,trial=0):
     Y = []
     x=env.reset()
     tt=[]
+    env.render()
     rewards=[]
     for t in range(T):
         if random:
-            u = env.action_space.sample()
+            u = np.random.rand(7)*0.1-0.05
         else:
             u = pilco.compute_action(x[None, :])[0, :]
         new_x = env.step(u)
         tt.append(t)
-        distance=np.linalg.norm(new_x-env.target)
+        distance=np.linalg.norm(new_x[:3]-env.target)
         rewards.append(distance)
         env.render()
         X.append(np.hstack((x, u)))
         Y.append(new_x-x)
         x=new_x
-        if np.linalg.norm(new_x-env.target) <0.05:
+        if np.linalg.norm(new_x[:3]-env.target) <0.05:
             break
     plt.plot(tt, rewards)
     plt.title("distance to goal - Trial %d" %trial)
@@ -115,6 +136,8 @@ def plot(pilco,X,Y,T,trial):
         axes[i].fill_between(range(len(y_pred_test)),
                          y_pred_test[:, 0] - 2 * np.sqrt(var_pred_test[:, 0]),
                          y_pred_test[:, 0] + 2 * np.sqrt(var_pred_test[:, 0]), alpha=0.3)
+        if i==2: break
+
     plt.savefig("onep%d.png" % trial)
     plt.show()
     m_p = np.zeros((T, state_dim))
@@ -134,6 +157,8 @@ def plot(pilco,X,Y,T,trial):
         axes[i].fill_between(range(T - 1),
                          m_p[0:T - 1, i] - 2 * np.sqrt(S_p[0:T - 1, i, i]),
                          m_p[0:T - 1, i] + 2 * np.sqrt(S_p[0:T - 1, i, i]), alpha=0.2)
+        if i == 2: break
+
     plt.savefig("multistep%d.png" % trial)
     plt.show()
 
@@ -141,19 +166,19 @@ with tf.Session() as sess:
     p_start=time.time()
     target=np.array([1.2,0.38,0.38])
     env = EnvWrapper(target)
-    T=20
+    T=50
     num_basis_functions = 50
-    max_action = 1.0
+    max_action = 0.1
     time_on_real_robot = 0
     X,Y,t=rollout(env,T,random=True,trial=0)
     time_on_real_robot += t
     state_dim = Y.shape[1]
     control_dim = X.shape[1] - Y.shape[1]
     controller = RbfController(state_dim,control_dim, num_basis_functions, max_action)
-    reward = ExponentialReward(state_dim,t=target)
+    reward = ExponentialReward(3,t=target)
     pilco=PILCO(X,Y,controller=controller,reward=reward)
     plot(pilco,X,Y,T,0)
-    n=6
+    n=4
     t_model=0
     t_policy=0
     for i in range(1,n):
@@ -171,7 +196,9 @@ with tf.Session() as sess:
         time_on_real_robot += t
         plot(pilco,X_,Y_,T,i)
         X=np.vstack((X,X_[:T, :]))
+        X=X[:2*T]
         Y=np.vstack((Y,Y_[:T, :]))
+        Y=Y[:2*T]
         pilco.mgpr.set_XY(X,Y)
     print("t_robot= %.2f s" %time_on_real_robot)
     print("t_model= %.2f s" %t_model)

@@ -40,6 +40,8 @@ class ExponentialReward(Reward):
         Output M : [1, 1]
         Output S  : [1, 1]
         '''
+        m=m[:,:3]
+        s=s[:3,:3]
 
         SW = s @ self.W
 
@@ -60,24 +62,4 @@ class ExponentialReward(Reward):
         sR = r2 - muR @ muR
         muR.set_shape([1, 1])
         sR.set_shape([1, 1])
-        return muR, sR
-
-class CombinedRewards(Reward):
-    def __init__(self, state_dim, rewards=[], coefs=None):
-        Reward.__init__(self)
-        self.state_dim = state_dim
-        self.base_rewards = rewards
-        if coefs is not None:
-            self.coefs = coefs
-        else:
-            self.coefs = np.ones(len(rewards))
-
-    @params_as_tensors
-    def compute_reward(self, m, s):
-        muR = 0
-        sR = 0
-        for c,r in enumerate(self.base_rewards):
-            tmp1, tmp2 = r.compute_reward(m, s)
-            muR += self.coefs[c] * tmp1
-            sR += self.coefs[c]**2 * tmp2
         return muR, sR
