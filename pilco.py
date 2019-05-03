@@ -53,7 +53,7 @@ class PILCO(gpflow.models.Model):
         print('---Noises---')
         print(pd.DataFrame(data=noises))
 
-    def optimize_policy(self, maxiter=50, restarts=0):
+    def optimize_policy(self, maxiter=30, restarts=0):
         '''
         Optimize controller's parameter's
         '''
