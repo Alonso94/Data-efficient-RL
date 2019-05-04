@@ -34,7 +34,7 @@ class EnvWrapper():
             'robot0:shoulder_pan_joint': self.q[0],
             'robot0:shoulder_lift_joint': self.q[1],
             'robot0:upperarm_roll_joint': self.q[2],
-            'robot0:elbow_flex_joint': self.q[3]*0.0,
+            'robot0:elbow_flex_joint': 2.0,
             'robot0:forearm_roll_joint':self.q[4],
             'robot0:wrist_flex_joint':self.q[5],
             'robot0:wrist_roll_joint':self.q[6]
@@ -166,9 +166,9 @@ with tf.Session() as sess:
     p_start=time.time()
     target=np.array([1.2,0.38,0.38])
     env = EnvWrapper(target)
-    T=50
+    T=25
     num_basis_functions = 50
-    max_action = 0.1
+    max_action = 0.3
     time_on_real_robot = 0
     X,Y,t=rollout(env,T,random=True,trial=0)
     time_on_real_robot += t
